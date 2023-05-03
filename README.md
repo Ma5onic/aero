@@ -35,9 +35,85 @@ Add the absolute path of the root directory of ViSQOL (where the WORKSPACE file 
 
 ### Download data
 
-For speech we use the [VCTK Corpus](https://datashare.ed.ac.uk/handle/10283/3443). \
+For speech we use the [VCTK Corpus](https://datashare.ed.ac.uk/handle/10283/3443). 
 For music we use the mixture tracks of [MUSDB18-HQ](https://sigsep.github.io/datasets/musdb.html#musdb18-hq-uncompressed-wav) dataset.
 Make sure to download the uncompressed WAV version.
+
+### Expected File/Folder Structure
+
+The script expects a specific folder structure for the dataset. The dataset should be organized into a main directory with subdirectories for each speaker. Each subdirectory should contain audio files corresponding to that speaker.
+
+Example structure:
+```
+data_dir/
+├── Speaker1
+│   ├── file1.wav
+│   ├── file2.wav
+│   └── ...
+├── Speaker2
+│   ├── file1.wav
+│   ├── file2.wav
+│   └── ...
+...
+
+```
+
+In this structure, each subdirectory represents a speaker or song, and contains audio files that correspond to different sources (e.g., bass, drums, mixture, other, vocals).
+
+#### Working with the MUSDB18-HQ Dataset
+If your dataset is in the musdb format, which is already split into train and test sets, you'll need to merge them into a single folder for both high resolution (`musdb-hr`) and low resolution (`musdb-lr`) versions:
+##### High Resolution Folder
+```
+musdb-hr/
+├── SongName1 - Artist1
+│   ├── bass.wav
+│   ├── drums.wav
+│   ├── mixture.wav
+│   ├── other.wav
+│   └── vocals.wav
+├── SongName2 - Artist2
+│   ├── bass.wav
+│   ├── drums.wav
+│   ├── mixture.wav
+│   ├── other.wav
+│   └── vocals.wav
+...
+```
+
+##### Low Resolution Folder
+```
+musdb-lr/
+├── SongName1 - Artist1
+│   ├── bass.wav
+│   ├── drums.wav
+│   ├── mixture.wav
+│   ├── other.wav
+│   └── vocals.wav
+├── SongName2 - Artist2
+│   ├── bass.wav
+│   ├── drums.wav
+│   ├── mixture.wav
+│   ├── other.wav
+│   └── vocals.wav
+...
+```
+
+To achieve this, you can use the following shell commands for both `musdb-hr` and `musdb-lr` directories:
+```shell
+# Assuming you have train and test folders inside the musdb-hr directory
+cd musdb-hr
+mv test/* train/
+mv train/* ./
+rm -r train test
+
+# Repeat the process for the musdb-lr directory
+cd ../musdb-lr
+mv test/* train/
+mv train/* ./
+rm -r train test
+```
+
+This will move all subdirectories from the `test` folder into the `train` folder, and then move all subdirectories from the `train` folder to the respective `musdb-hr` and `musdb-lr` folders. The `train` and `test` folders will then be removed.
 
 ### Resample data
 
@@ -54,34 +130,39 @@ This requires to resample to 4 different resolutions (not including the original
 For music, we downsample once to a target 11.025 kHz, from the original 44.1 kHz.
 
 E.g. for 4 and 16 kHz: \
-`python data_prep/resample_data.py --data_dir <path for 48 kHz data> --out_dir <path for 4 kHz data> --target_sr 4` \
+`python data_prep/resample_data.py --data_dir <path for 48 kHz data> --out_dir <path for 4 kHz data> --target_sr 4` 
 `python data_prep/resample_data.py --data_dir <path for 48 kHz data> --out_dir <path for 16 kHz data> --target_sr 16` 
 
 ### Create egs files
 
-For each low and high resolution pair, one should create "egs files" twice: for low and high resolution.  
-`create_meta_files.py` creates a pair of train and val "egs files", each under its respective folder.
-Each "egs file" contains meta information about the signals: paths and signal lengths.
+For each low and high-resolution pair, you need to create "egs files" twice: once for low-resolution and once for high-resolution. The `create_meta_files.py` script creates a pair of train and val "egs files", each under its respective folder. Each "egs file" contains meta information about the signals, such as paths and signal lengths.
+
+To generate the egs files, run the `create_meta_files.py` script with the appropriate arguments:
+```shell
+python data_prep/create_meta_files.py <data_dir_path> <target_dir> <json_filename> [--n_samples_limit <limit>]
+```
+
+Replace `<data_dir_path>` with the path to your dataset directory, `<target_dir>` with the output directory for the created JSON files, and `<json_filename>` with the desired filename for the JSON files. 
 
 e.g. to create egs files for the various speech settings:
 
-`python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr` \
+`python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr` 
 `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/4-16 hr`
 
-`python data_prep/create_meta_files.py <path for 8 kHz data> egs/vctk/8-16 lr` \
+`python data_prep/create_meta_files.py <path for 8 kHz data> egs/vctk/8-16 lr` 
 `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/8-16 hr`
 
-`python data_prep/create_meta_files.py <path for 8 kHz data> egs/vctk/8-24 lr` \
+`python data_prep/create_meta_files.py <path for 8 kHz data> egs/vctk/8-24 lr` 
 `python data_prep/create_meta_files.py <path for 24 kHz data> egs/vctk/8-24 hr`
 
-`python data_prep/create_meta_files.py <path for 12 kHz data> egs/vctk/12-48 lr` \
+`python data_prep/create_meta_files.py <path for 12 kHz data> egs/vctk/12-48 lr` 
 `python data_prep/create_meta_files.py <path for 46 kHz data> egs/vctk/12-48 hr`
 
 ### Creating dummy egs files (for debugging code)
-If you want to create dummy egs files for debugging code on small number of samples.
+If you want to create dummy egs files for debugging code on small number of samples, ,he **optional** `--n_samples_limit` argument allows you to limit the number of files processed by the script.
 (This might be a little buggy, make sure that the same files exist in high/low resolution meta (egs) files)
 
-`python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr --n_samples_limit=32` \
+`python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr --n_samples_limit=32` 
 `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/4-16 hr --n_samples_limit=32`
 
 ## Train
@@ -103,7 +184,7 @@ python train.py dset=4-16 experiment=aero_4-16_512_64 ddp=true
 
 - Make sure to create appropriate egs files for specific LR to HR setting
    - e.g. for `4-16`:  
-       `python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr` \
+       `python data_prep/create_meta_files.py <path for 4 kHz data> egs/vctk/4-16 lr` 
        `python data_prep/create_meta_files.py <path for 16 kHz data> egs/vctk/4-16 hr`
 - Create a directory with experiment name in the format: `aero-nfft=<NFFT>-hl=<HOP_LENGTH>` (e.g. `aero-nfft=512-hl=64`)
 - Copy/download appropriate `checkpoint.th` file to directory (make sure that the corresponding nfft,hop_length parameters correspond to experiment file)
